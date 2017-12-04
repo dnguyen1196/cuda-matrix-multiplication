@@ -1,0 +1,1 @@
+/usr/local/cuda-8.0/bin/nvcc -std=c++11 -O2 -arch=compute_50 -I /usr/local/cuda/samples/common/inc matrix_mpy.cu ee193_utils.cxx

@@ -1,0 +1,18 @@
+lab116t{mnguye16}74: ./a.out                                                                                 Working on 1024x1024 matrices.
+Dumb mpy took 1.88112sec
+mpy1 took 0.19111sec
+mpy1 took 0.069359sec
+mpy1 took 0.068452sec
+mpy1 took 0.067841sec
+Working on 2048x2048 matrices.
+Dumb mpy took 79.575sec
+mpy1 took 0.512623sec
+mpy1 took 0.506076sec
+mpy1 took 0.506157sec
+mpy1 took 0.502452sec
+Working on 4096x4096 matrices.
+Dumb mpy took 741.101sec
+mpy1 took 3.97331sec
+mpy1 took 3.96204sec
+mpy1 took 3.96249sec
+mpy1 took 3.96554sec

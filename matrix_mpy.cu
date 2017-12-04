@@ -114,7 +114,7 @@ void Matrix::mpy_dumb (const Matrix &A, const Matrix &B) {
 }
 
 
-__global__ int map(int ri, int ci, int rb, int cb, int N){
+__device__ int map(int ri, int ci, int rb, int cb, int N){
     return N*(rb*BS+ri)+cb*BS+ci;
 }
 
@@ -126,24 +126,26 @@ __global__ void mat_mult (float *d_A, float *d_B, float *d_C, int N) {
     int cb = blockIdx.y;
     int ri = threadIdx.x;
     int ci = threadIdx.y;
+    int Nb = gridDim.x;
 
     // Allocate shared memory
-    __shared__ float SA[BS][BS],SB[BS][BS];
+    __shared__ float SA[BS][BS];
+    __shared__ float SB[BS][BS];
 
-    int sum = 0; // This will store final value of C[ri,ci]
+    float sum = 0.0; // This will store final value of C[ri,ci]
     // Copy the data to shared memory
-    for (int kb = 0; kb < N; kB++) {
-        SA[ri, ci] = d_A[map(ri, ci, rb, kb, N)];
-        SB[ri, ci] = d_B[map(ri, ci, kb, cb, N)];
+    for (int kb = 0; kb < Nb; kb++) {
+        SA[ri][ci] = d_A[map(ri, ci, rb, kb, N)];
+        SB[ri][ci] = d_B[map(ri, ci, kb, cb, N)];
         __syncthreads();
 
         // Do actual computations
         for (int ki = 0; ki < BS; ki++) {
-            sum += SA[ri, ki] * SB[ki, ci];
+            sum += SA[ri][ki] * SB[ki][ci];
         }
         __syncthreads();
     }
-    // Copy sum back to d_C
+    // Copy the sum back to d_C
     d_C[map(ri,ci,rb,cb,N)] = sum;
 }
 
@@ -162,27 +164,29 @@ void Matrix::mpy1 (const Matrix &A, const Matrix &B) {
     float *d_A = NULL;
     cudaError_t err = cudaMalloc((void **)&d_A, sizeBytes);
     ERR_CHK (err, "Failed to allocate device matrix A");
-    cudaMemcpy(d_A, A.data(), sizeBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_A, &(A.data[0]), sizeBytes, cudaMemcpyHostToDevice);
 
     // Allocate memory for B and copy data from host to device
     float *d_B = NULL;
-    cudaError_t err = cudaMalloc((void **)&d_B, sizeBytes);
+    err = cudaMalloc((void **)&d_B, sizeBytes);
     ERR_CHK (err, "Failed to allocate device matrix B");
-    cudaMemcpy(d_B, B.data(), sizeBytes, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, &(B.data[0]), sizeBytes, cudaMemcpyHostToDevice);
 
     // Alocate memory for C
     float *d_C = NULL;
-    cudaError_t err = cudaMalloc((void **)&d_C, sizeBytes);
+    err = cudaMalloc((void **)&d_C, sizeBytes);
     ERR_CHK (err, "Failed to allocate device matrix C");
 
     int Nb = A.N()/BS;
-    dim3 thBlocks(Nb, Nb), threads(BS, BS);
+    int N = A.N();
+    dim3 GridDim(Nb, Nb);
+    dim3 BlockDim(BS, BS);
 
     // Do the computations and write on d_C
-    mat_mult<<<thBlocks,threads>>>(d_A,d_B,d_C,A.N());
+    mat_mult<<<GridDim,BlockDim>>>(d_A,d_B,d_C,N);
 
     // Copy the memory back from d_C to host memory
-    cudaMemcpy(this->data, d_C, sizeBytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(&(this->data[0]), d_C, sizeBytes, cudaMemcpyDeviceToHost);
 
     long int time = delta_usec (start);
     cout<<"mpy1 took "<<(time/1000000.0)<<"sec"<<endl;
@@ -205,6 +209,8 @@ static void run (int log2_N) {
 
     for (int i=0; i<4; ++i) {
 	d.mpy1 (b, a);
+
+
 	//LOG ("Ref C="<<c.str()<<", D="<<d.str());
 	c.compare (d);
     }
